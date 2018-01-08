@@ -1,0 +1,13 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+    - chmod +x ./scripts/*
+    - ./scripts/install-kubectl.sh
+    - ./scripts/download-istio.sh
+    - ./scripts/install-istio.sh
+  build:
+    commands:
+    - ./scripts/deploy-bookinfo-v1.sh
+  post_build:
+    commands:

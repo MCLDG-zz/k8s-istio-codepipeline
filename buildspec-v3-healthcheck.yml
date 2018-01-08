@@ -1,0 +1,12 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+    - chmod +x ./scripts/*
+    - ./scripts/install-kubectl.sh
+    - ./scripts/download-istio.sh
+  build:
+    commands:
+    - ./scripts/deploy-v3-healthcheck.sh
+  post_build:
+    commands:

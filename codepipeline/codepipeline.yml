@@ -1,0 +1,337 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Application deployment CodePipeline that deploys the Bookinfo application to Kubernetes
+
+Parameters:
+  CodeBranch:
+    Type: String
+    Default: master
+
+Resources:
+
+  PipelineArtifactBucket:
+    Type: AWS::S3::Bucket
+    
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+              - sts:AssumeRole
+  BuildProjectPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: root
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Resource: "*"
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+          - Resource:
+              - !Join ['',['arn:aws:s3:::',!Ref PipelineArtifactBucket, '/*']]
+              - !Join ['',['arn:aws:s3:::',!Ref PipelineArtifactBucket]]
+            Effect: Allow
+            Action:
+              - s3:GetObjectVersion
+              - s3:PutObject
+              - s3:GetBucketPolicy
+              - s3:GetObject
+              - s3:ListBucket
+      Roles:
+        -
+          !Ref CodeBuildServiceRole
+
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSCodeCommitFullAccess'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+  PipelinePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: root
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Resource:
+              - !Join ['',['arn:aws:s3:::',!Ref PipelineArtifactBucket, '/*']]
+              - !Join ['',['arn:aws:s3:::',!Ref PipelineArtifactBucket]]
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+              - s3:GetObjectVersion
+              - s3:GetBucketVersioning
+              - s3:GetBucketPolicy
+              - s3:ListBucket
+          - Resource: "*"
+            Effect: Allow
+            Action:
+              - codepipeline:*
+              - codebuild:*
+              - cloudformation:*
+              - iam:*
+              - s3:*
+      Roles:
+        -
+          !Ref CodePipelineServiceRole
+
+  CodeRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Sub "${AWS::StackName}"
+      RepositoryDescription: 'Source Code Repository for bookinfo application'
+
+  InstallCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec-install.yml"
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/docker:1.12.1"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+      Name: !Sub "${AWS::StackName}-CodeBuild-Install"
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  CanaryV2CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec-canary-v2.yml"
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/docker:1.12.1"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+      Name: !Sub "${AWS::StackName}-CodeBuild-CanaryV2"
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  CanaryV2HealthCheckCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec-canary-v2-healthcheck.yml"
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/docker:1.12.1"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+      Name: !Sub "${AWS::StackName}-CodeBuild-CanaryV2HealthCheck"
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  AllV2CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec-all-v2.yml"
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/docker:1.12.1"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+      Name: !Sub "${AWS::StackName}-CodeBuild-AllV2"
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  BlueGreenV3CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec-bluegreen-v3.yml"
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/docker:1.12.1"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+      Name: !Sub "${AWS::StackName}-CodeBuild-BlueGreenV3"
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  V3HealthCheckCodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: "CODEPIPELINE"
+      Source:
+        Type: "CODEPIPELINE"
+        BuildSpec: "buildspec-v3-healthcheck.yml"
+      Environment:
+        ComputeType: "BUILD_GENERAL1_SMALL"
+        Image: "aws/codebuild/docker:1.12.1"
+        Type: "LINUX_CONTAINER"
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+      Name: !Sub "${AWS::StackName}-CodeBuild-V3HealthCheck"
+      ServiceRole: !Ref CodeBuildServiceRole
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: App
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Version: 1
+                Provider: CodeCommit
+              Configuration:
+                RepositoryName: !GetAtt CodeRepository.Name
+                BranchName: !Ref CodeBranch
+              OutputArtifacts:
+                - Name: App
+              RunOrder: 1
+        - Name: DeployV1
+          Actions:
+            - Name: DeployV1
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref InstallCodeBuildProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: DeployV1Output
+              RunOrder: 1
+        - Name: CanaryV2
+          Actions:
+            - Name: CanaryV2
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CanaryV2CodeBuildProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: CanaryV2Output
+              RunOrder: 1
+        - Name: CanaryV2HealthCheck
+          Actions:
+            - Name: CanaryV2HealthCheck
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CanaryV2HealthCheckCodeBuildProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: CanaryV2HealthCheckOutput
+              RunOrder: 1
+        - Name: AllV2
+          Actions:
+            - Name: AllV2
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref AllV2CodeBuildProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: AllV2Output
+              RunOrder: 1
+        - Name: BlueGreenV3
+          Actions:
+            - Name: BlueGreenV3
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref BlueGreenV3CodeBuildProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: BlueGreenV3Output
+              RunOrder: 1
+        - Name: V3HealthCheck
+          Actions:
+            - Name: V3HealthCheck
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref V3HealthCheckCodeBuildProject
+              InputArtifacts:
+                - Name: App
+              OutputArtifacts:
+                - Name: V3HealthCheckOutput
+              RunOrder: 1
+
+Outputs:
+  PipelineUrl:
+    Description: The URL for the CodePipeline AWS Management Console.
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
+  SourceCodeCommitCloneUrlHttp:
+    Description: The URL for the source code CodeCommit repo.
+    Value: !GetAtt CodeRepository.CloneUrlHttp
