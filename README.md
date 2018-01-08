@@ -1,12 +1,13 @@
-# k8s-istio-codepipeline
-CodePipeline that demo's different rollout strategies using Istio on K8s. I use this to demo Canary and Blue/Green
+# Using AWS CodePipeline to demonstrate deployment strategies on Kubernetes/Istio
+CodePipeline that demo's different deployment strategies using Istio on K8s. I use this to demo Canary and Blue/Green
 deployments on Kubernetes.
 
-##Preparing for the demo
+## Preparing for the demo
 The demo is a combination of:
 * Running the CodePipeline to deploy the app, first a Canary, then a Blue/Green deployment
 * Showing the application web page in a browser so we can see the results of the deployment
-* Showing the slides, and explaining the concepts
+* Showing the slides (deck titled DevOps Breakout Sessions - kept internally), and explaining the concepts
+
 Getting the timing right requires some practice
 
 Prepare the CodePipeline:
@@ -16,7 +17,7 @@ Prepare the CodePipeline:
 * I use this Firefox add-on to automatically reload web pages. This show the effects of the deployment on the app - http://reloadevery.mozdev.org/
 * Trigger the pipeline, either manually in the AWS CodePipeline console or by pushing code to the repo
 * In the CodePipeline console, disable the transition between DeployV1 and CanaryV2 (click the arrow in the CodePipeline)
-* Explain the slides in this deck verbally while the pipeline is progressing: 
+* Explain the slides in the associated deck verbally while the pipeline is progressing: 
     * CodePipeline – a CI/CD Pipeline
     * Review the Bookinfo application
 * Enable the transition between DeployV1 and CanaryV2 and:
@@ -24,11 +25,12 @@ Prepare the CodePipeline:
     * Show the pipeline progress; view the app in the browser using auto-reload. You’ll see some pages with no ratings, and others with black star ratings. 
 * As AllV2 continues and complete, only black stars will appear in the ratings section
 * Continue to Blue/GreenV3
+    * Explain the slide Blue/Green deployment – v2 to v3
 * As the web page auto-refreshes, you’ll see black stars, then suddenly red stars as Istio switches traffic from V2 (black stars) to V3 (red stars)
 * The V3HealthCheck will start and fail.
 * I’ve programmed V3HealthCheck to fail to simulate rollback. You’ll suddenly see black stars again as it rolls back to V2
 
-##Kubernetes Cluster
+## Kubernetes Cluster
 This demo pipeline requires a Kubernetes cluster on AWS. To deploy a Kubernetes cluster following the
 instructions here: https://github.com/aws-samples/aws-workshop-for-kubernetes/tree/master/cluster-install
 
@@ -36,7 +38,7 @@ When you get to the choice on which type of cluster to create, in the section ti
 use a `Default Gossip Based Cluster`. This will create a single master, multi-node and multi-az configuration, which
 is sufficient for the demo.
 
-##Update kubeconfig
+## Update kubeconfig
 CodePipeline uses CodeBuild projects to update the Kubernetes cluster. To connect to Kubernetes, CodeBuild will
 need a kubeconfig.conf with the connection information for the Kubernetes cluster. After you have created your Kubernetes
 cluster, follow these instructions to update the kubeconfig.conf:
@@ -89,7 +91,7 @@ Copy this section from ~/.kube/config to kubeconfig.conf, where the name equals 
     username: admin
 ```
 
-##Create the CodePipeline
+## Create the CodePipeline
 Use the script provided to create the AWS CodePipeline. Edit `create-stack.sh` and update the region to your default 
 region - the same region in which you created your Kubernetes cluster. If you aren't sure which region you created
 your Kubernetes cluster in, go back to your command line and run the following command, checking the AZ's where your
@@ -106,7 +108,7 @@ cd codepipeline
 ./create-stack.sh
 ```
 
-##Trigger the CodePipeline
+## Trigger the CodePipeline
 The AWS CodePipeline will be triggered by copying the code from this repo and pushing it to the repo created by the `create-stack.sh`
 script above. In the AWS CloudFormation console, in the same account/region in which you created your Kubernetes, 
 find the `bookinfo` stack. Look at the Output variables. 
@@ -133,7 +135,7 @@ exist in the directory you cloned into.
 This will push the source code to CodeCommit, and trigger the CodePipeline. Each time you want to trigger the CodePipeline,
  you can make a dummy change to any file in the CodeCommit repo and push it to CodeCommit. 
 
-##Checking CodePipeline progress
+## Checking CodePipeline progress
 You can find the CodePipeline in the AWS CloudFormation console by clicking the value of the PipelineUrl stack 
 output variable in the 'bookinfo' stack. This will open the AWS CodePipeline in the console and you can watch the
 pipeline progressing through the Source, Deploy, Canary steps, etc. If a step fails you can click on 'Details' to see
@@ -143,7 +145,7 @@ What I will do during a demo is to run the pipeline before I start talking, and 
 can disable the transition between the CodePipeline steps in the console by clicking the arrow between steps. You can
 then enable the step once you are ready to continue.
 
-##Getting the URL for the Bookinfo application
+## Getting the URL for the Bookinfo application
 View the CodePipeline in the AWS Console, as explained above. Once the DeployV1 step succeeds, click the `Details` link.
 In the `Build logs` section of the CodeBuild page, you'll see a comment `getting the DNS for the productpage endpoint`.
 The following line is the URL. Use this URL in a browser, as in 
